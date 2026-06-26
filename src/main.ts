@@ -6,13 +6,28 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  const allowedOrigins = [
+    'http://localhost:3000',
+    config.get<string>('FRONTEND_URL'),
+  ].filter(Boolean);
 
   app.enableCors({
-    origin: [
-      config.get<string>('FRONTEND_LOCAL_URL') ?? 'http://localhost:3000',
-      config.get<string>('FRONTEND_PRODUCTION_URL') ?? '',
-    ].filter(Boolean),
-    credentials: true,
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const isAllowedOrigin = allowedOrigins.includes(origin);
+      const isVercelPreview = origin.endsWith('.vercel.app');
+
+      if (isAllowedOrigin || isVercelPreview) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.useGlobalPipes(
